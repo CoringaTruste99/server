@@ -1,65 +1,77 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from threading import Thread
-import time
+import os
+import json
 
 app = Flask(__name__)
 CORS(app)
 
-# Estado actual del temporizador y control manual
-config = {
-    "intervalo_minutos": 30,
-    "activar_servo": False,
-    "temporizador_activo": True
-}
+CONFIG_FILE = "servo_config.json"
 
-ultimo_activado = 0  # Timestamp del último disparo
+# Inicializa archivo de configuración si no existe
+if not os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump({
+            "activar_servo": False,
+            "intervalo_minutos": 30,
+            "temporizador_activo": True
+        }, f)
 
-@app.route("/config", methods=["POST"])
-def configurar():
-    global ultimo_activado
-    data = request.get_json()
-    intervalo = data.get("intervalo_minutos")
-    activar = data.get("activar_servo")
-    temporizador = data.get("temporizador_activo")
+# Cargar configuración desde archivo
+def cargar_config():
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
 
-    if intervalo is not None:
-        config["intervalo_minutos"] = intervalo
-    if activar is not None:
-        config["activar_servo"] = activar
-        if activar == False:
-            ultimo_activado = time.time()
-    if temporizador is not None:
-        config["temporizador_activo"] = temporizador
+# Guardar configuración al archivo
+def guardar_config(data):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(data, f)
 
-    return jsonify({"status": "config_actualizada", "config": config}), 200
+# Ruta GET usada por el ESP32 para leer si debe activar el servo
+@app.route("/get_servo_config", methods=["GET"])
+def get_servo_config():
+    try:
+        config = cargar_config()
+        return jsonify(config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/config", methods=["GET"])
-def obtener_config():
-    return jsonify(config), 200
+# Ruta POST usada por el ESP32 para resetear el flag después de activarse
+@app.route("/reset_servo_flag", methods=["POST"])
+def reset_servo_flag():
+    try:
+        config = cargar_config()
+        config["activar_servo"] = False  # Resetea el flag
+        guardar_config(config)
+        return jsonify({"status": "flag_reset_ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/activar", methods=["POST"])
-def activar_servo_manual():
-    config["activar_servo"] = True
-    return jsonify({"status": "servo_activado"}), 200
+# Ruta POST usada por la app Expo para cambiar intervalo y/o activar manualmente el servo
+@app.route("/set_servo_config", methods=["POST"])
+def set_servo_config():
+    try:
+        data = request.get_json()
+        config = cargar_config()
 
-@app.route("/ping", methods=["GET"])
-def ping():
-    return jsonify({"status": "online"}), 200
+        # Cambiar temporizador si se manda explícitamente
+        if "temporizador_activo" in data:
+            config["temporizador_activo"] = bool(data["temporizador_activo"])
 
-def loop_control():
-    global ultimo_activado
-    while True:
-        time.sleep(5)
-        ahora = time.time()
-        intervalo_segundos = config["intervalo_minutos"] * 60
-        if config.get("temporizador_activo", True):
-            if ahora - ultimo_activado >= intervalo_segundos:
-                config["activar_servo"] = True
-                ultimo_activado = ahora
+        # Cambiar intervalo si se envía
+        if "intervalo_minutos" in data:
+            intervalo = float(data["intervalo_minutos"])
+            if 0 <= intervalo <= 999:
+                config["intervalo_minutos"] = intervalo
 
-# Ejecutar thread en segundo plano
-Thread(target=loop_control, daemon=True).start()
+        # Activación manual
+        if "activar_servo" in data and data["activar_servo"]:
+            config["activar_servo"] = True  # Se activa una vez
+
+        guardar_config(config)
+        return jsonify(config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+    app.run(debug=True)
