@@ -9,7 +9,8 @@ CORS(app)
 # Estado actual del temporizador y control manual
 config = {
     "intervalo_minutos": 30,
-    "activar_servo": False
+    "activar_servo": False,
+    "temporizador_activo": True
 }
 
 ultimo_activado = 0  # Timestamp del último disparo
@@ -20,6 +21,7 @@ def configurar():
     data = request.get_json()
     intervalo = data.get("intervalo_minutos")
     activar = data.get("activar_servo")
+    temporizador = data.get("temporizador_activo")
 
     if intervalo is not None:
         config["intervalo_minutos"] = intervalo
@@ -27,6 +29,8 @@ def configurar():
         config["activar_servo"] = activar
         if activar == False:
             ultimo_activado = time.time()
+    if temporizador is not None:
+        config["temporizador_activo"] = temporizador
 
     return jsonify({"status": "config_actualizada", "config": config}), 200
 
@@ -49,9 +53,10 @@ def loop_control():
         time.sleep(5)
         ahora = time.time()
         intervalo_segundos = config["intervalo_minutos"] * 60
-        if ahora - ultimo_activado >= intervalo_segundos:
-            config["activar_servo"] = True
-            ultimo_activado = ahora
+        if config.get("temporizador_activo", True):
+            if ahora - ultimo_activado >= intervalo_segundos:
+                config["activar_servo"] = True
+                ultimo_activado = ahora
 
 # Ejecutar thread en segundo plano
 Thread(target=loop_control, daemon=True).start()
