@@ -16,6 +16,7 @@ ultimo_activado = 0  # Timestamp del último disparo
 
 @app.route("/config", methods=["POST"])
 def configurar():
+    global ultimo_activado
     data = request.get_json()
     intervalo = data.get("intervalo_minutos")
     activar = data.get("activar_servo")
@@ -24,6 +25,9 @@ def configurar():
         config["intervalo_minutos"] = intervalo
     if activar is not None:
         config["activar_servo"] = activar
+        # Si la bandera se resetea a False, actualizar timestamp
+        if activar == False:
+            ultimo_activado = time.time()
 
     return jsonify({"status": "config_actualizada", "config": config}), 200
 
