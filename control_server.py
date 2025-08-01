@@ -31,6 +31,11 @@ def configurar():
 def obtener_config():
     return jsonify(config), 200
 
+@app.route("/activar", methods=["POST"])
+def activar_servo_manual():
+    config["activar_servo"] = True
+    return jsonify({"status": "servo_activado"}), 200
+
 @app.route("/ping", methods=["GET"])
 def ping():
     return jsonify({"status": "online"}), 200
