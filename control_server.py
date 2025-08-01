@@ -27,49 +27,33 @@ def guardar_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f)
 
-# Ruta GET usada por el ESP32 para leer si debe activar el servo
-@app.route("/get_servo_config", methods=["GET"])
-def get_servo_config():
+# Ruta única para manejar toda la configuración
+@app.route("/config", methods=["GET", "POST"])
+def handle_config():
     try:
         config = cargar_config()
-        return jsonify(config)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Ruta POST usada por el ESP32 para resetear el flag después de activarse
-@app.route("/reset_servo_flag", methods=["POST"])
-def reset_servo_flag():
-    try:
-        config = cargar_config()
-        config["activar_servo"] = False  # Resetea el flag
-        guardar_config(config)
-        return jsonify({"status": "flag_reset_ok"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Ruta POST usada por la app Expo para cambiar intervalo y/o activar manualmente el servo
-@app.route("/set_servo_config", methods=["POST"])
-def set_servo_config():
-    try:
-        data = request.get_json()
-        config = cargar_config()
-
-        # Cambiar temporizador si se manda explícitamente
-        if "temporizador_activo" in data:
-            config["temporizador_activo"] = bool(data["temporizador_activo"])
-
-        # Cambiar intervalo si se envía
-        if "intervalo_minutos" in data:
-            intervalo = float(data["intervalo_minutos"])
-            if 0 <= intervalo <= 999:
-                config["intervalo_minutos"] = intervalo
-
-        # Activación manual
-        if "activar_servo" in data and data["activar_servo"]:
-            config["activar_servo"] = True  # Se activa una vez
-
-        guardar_config(config)
-        return jsonify(config)
+        
+        if request.method == "GET":
+            return jsonify(config)
+            
+        elif request.method == "POST":
+            data = request.get_json()
+            
+            # Actualizar solo los campos proporcionados
+            if "intervalo_minutos" in data:
+                intervalo = float(data["intervalo_minutos"])
+                if 0 <= intervalo <= 999:
+                    config["intervalo_minutos"] = intervalo
+                    
+            if "temporizador_activo" in data:
+                config["temporizador_activo"] = bool(data["temporizador_activo"])
+                
+            if "activar_servo" in data:
+                config["activar_servo"] = bool(data["activar_servo"])
+            
+            guardar_config(config)
+            return jsonify(config)
+            
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
