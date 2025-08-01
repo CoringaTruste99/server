@@ -25,7 +25,6 @@ def configurar():
         config["intervalo_minutos"] = intervalo
     if activar is not None:
         config["activar_servo"] = activar
-        # Si la bandera se resetea a False, actualizar timestamp
         if activar == False:
             ultimo_activado = time.time()
 
