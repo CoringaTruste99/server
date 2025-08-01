@@ -14,7 +14,8 @@ if not os.path.exists(CONFIG_FILE):
         json.dump({
             "activar_servo": False,
             "intervalo_minutos": 30,
-            "temporizador_activo": True
+            "temporizador_activo": True,
+            "rfid_activo": True  # Nuevo campo para controlar RFID
         }, f)
 
 # Cargar configuración desde archivo
@@ -50,6 +51,9 @@ def handle_config():
                 
             if "activar_servo" in data:
                 config["activar_servo"] = bool(data["activar_servo"])
+            
+            if "rfid_activo" in data:  # Nuevo campo
+                config["rfid_activo"] = bool(data["rfid_activo"])
             
             guardar_config(config)
             return jsonify(config)
